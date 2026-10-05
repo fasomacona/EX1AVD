@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Examen: Datos y su Preprocesamiento + Correlación de Pearson</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Arial,sans-serif; }
+  body { background:#0f172a; color:#e2e8f0; min-height:100vh; }
+  .hidden { display:none !important; }
+  #startScreen { max-width:640px; margin:0 auto; padding:40px 20px; }
+  #startScreen .card { background:#1e293b; border-radius:16px; padding:36px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  h1 { color:#38bdf8; font-size:1.6rem; margin-bottom:8px; }
+  h2 { color:#94a3b8; font-size:1rem; font-weight:normal; margin-bottom:24px; }
+  label { display:block; margin:14px 0 6px; color:#cbd5e1; font-size:.95rem; }
+  input[type=text], input[type=email] { width:100%; padding:12px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#e2e8f0; font-size:1rem; }
+  input:focus { outline:none; border-color:#38bdf8; }
+  .rules { background:#0f172a; border-left:4px solid #f59e0b; padding:14px 16px; margin:20px 0; border-radius:6px; font-size:.9rem; line-height:1.7; }
+  .rules b { color:#f59e0b; }
+  .btn { display:inline-block; padding:14px 32px; border:none; border-radius:8px; font-size:1.05rem; font-weight:600; cursor:pointer; transition:.2s; }
+  .btn-primary { background:#0ea5e9; color:#fff; width:100%; margin-top:10px; }
+  .btn-primary:hover { background:#0284c7; }
+  .btn-secondary { background:#334155; color:#e2e8f0; }
+  .btn-secondary:hover { background:#475569; }
+  .btn-danger { background:#dc2626; color:#fff; }
+  .btn-danger:hover { background:#b91c1c; }
+  #topbar { display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:10px 20px; position:sticky; top:0; z-index:50; border-bottom:2px solid #334155; flex-wrap:wrap; gap:8px; }
+  #timer { font-size:1.3rem; font-weight:700; color:#38bdf8; font-variant-numeric:tabular-nums; }
+  #timer.low { color:#ef4444; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.5; } }
+  #strikesBox { font-size:.9rem; color:#f59e0b; }
+  #examLayout { display:flex; max-width:1200px; margin:0 auto; gap:16px; padding:16px; }
+  #sidebar { width:230px; flex-shrink:0; background:#1e293b; border-radius:12px; padding:16px; height:fit-content; position:sticky; top:70px; }
+  #sidebar h3 { font-size:.9rem; color:#94a3b8; margin-bottom:10px; }
+  #qGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .qdot { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:6px; background:#334155; cursor:pointer; font-size:.85rem; font-weight:600; border:2px solid transparent; transition:.15s; }
+  .qdot:hover { transform:scale(1.1); }
+  .qdot.current { border-color:#38bdf8; box-shadow:0 0 8px #38bdf8; }
+  .qdot.answered { background:#16a34a; color:#fff; }
+  .qdot.unanswered { background:#334155; color:#94a3b8; }
+  .legend { margin-top:14px; font-size:.75rem; line-height:2; color:#94a3b8; }
+  .legend span { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+  #mainPanel { flex:1; background:#1e293b; border-radius:12px; padding:28px; min-height:420px; display:flex; flex-direction:column; }
+  #qCounter { color:#38bdf8; font-size:.85rem; font-weight:600; margin-bottom:6px; }
+  #qTopic { color:#64748b; font-size:.78rem; margin-bottom:14px; text-transform:uppercase; letter-spacing:.5px; }
+  #qText { font-size:1.15rem; line-height:1.6; margin-bottom:24px; }
+  .option { display:flex; align-items:center; gap:12px; padding:14px 16px; margin-bottom:10px; background:#0f172a; border:2px solid #334155; border-radius:10px; cursor:pointer; transition:.15s; }
+  .option:hover { border-color:#475569; }
+  .option.selected { border-color:#38bdf8; background:#082f49; }
+  .option .letter { width:28px; height:28px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0; }
+  .option.selected .letter { background:#0ea5e9; }
+  #navBtns { display:flex; justify-content:space-between; margin-top:auto; padding-top:24px; }
+  #strikeModal { position:fixed; inset:0; background:rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; z-index:100; }
+  #strikeModal .box { background:#7f1d1d; border:2px solid #ef4444; border-radius:14px; padding:32px; max-width:440px; text-align:center; }
+  #strikeModal h3 { color:#fecaca; font-size:1.4rem; margin-bottom:12px; }
+  #strikeModal p { color:#fee2e2; line-height:1.6; margin-bottom:8px; }
+  #strikeCountBig { font-size:2.4rem; font-weight:800; color:#fff; }
+  #resultScreen { max-width:600px; margin:0 auto; padding:40px 20px; text-align:center; }
+  #resultScreen .card { background:#1e293b; border-radius:16px; padding:40px; }
+  #finalScore { font-size:4rem; font-weight:800; color:#38bdf8; margin:16px 0; }
+  .res-line { color:#94a3b8; margin:6px 0; }
+  #saveStatus { margin-top:16px; font-size:.9rem; color:#f59e0b; }
+  @media (max-width:800px) {
+    #examLayout { flex-direction:column; }
+    #sidebar { width:100%; position:static; }
+    #qGrid { grid-template-columns:repeat(10,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+  <div class="card">
+    <h1>Examen: Análisis y Visualización de Datos</h1>
+    <h2>Tema 1. Datos y su preprocesamiento · Tema 2.1.1 Correlación lineal (Pearson)</h2>
+    <label for="studentName">Nombre completo:</label>
+    <input type="text" id="studentName" placeholder="Tu nombre" autocomplete="off">
+    <label for="studentEmail">Correo institucional:</label>
+    <input type="email" id="studentEmail" placeholder="tu@correo.com" autocomplete="off">
+    <div class="rules">
+      <b>⚠ REGLAS DEL EXAMEN — LEE CON ATENCIÓN</b><br>
+      1. El examen dura <b>90 minutos</b> y consta de <b>30 preguntas</b> de opción múltiple.<br>
+      2. Al iniciar, el examen se abrirá en <b>pantalla completa</b>. No la cierres.<br>
+      3. Está <b>prohibido</b>: minimizar la ventana, cambiar de pestaña, copiar, pegar o usar el menú contextual.<br>
+      4. Cada infracción cuenta como <b>1 falta</b>. Con <b>más de 5 faltas</b> el examen se <b>termina automáticamente</b>.<br>
+      5. Puedes avanzar, retroceder y cambiar tus respuestas libremente antes de entregar.<br>
+      6. Tus resultados se guardan automáticamente en la base de datos.
+    </div>
+    <button class="btn btn-primary" id="startBtn">🚀 Iniciar examen (pantalla completa)</button>
+    <p id="startError" style="color:#ef4444; margin-top:12px; font-size:.9rem;"></p>
+  </div>
+</div>
+
+<div id="examScreen" class="hidden">
+  <div id="topbar">
+    <div><b id="studentLabel"></b></div>
+    <div id="timer">90:00</div>
+    <div id="strikesBox">⚠ Faltas: <b id="strikeCount">0</b>/5</div>
+  </div>
+  <div id="examLayout">
+    <aside id="sidebar">
+      <h3>Navegación de preguntas</h3>
+      <div id="qGrid"></div>
+      <div class="legend">
+        <div><span style="background:#16a34a"></span>Contestada</div>
+        <div><span style="background:#334155"></span>Sin contestar</div>
+        <div><span style="background:#1e293b;border:2px solid #38bdf8"></span>Actual</div>
+      </div>
+      <button class="btn btn-danger" id="submitBtn" style="width:100%; margin-top:16px;">Entregar examen</button>
+    </aside>
+    <main id="mainPanel">
+      <div id="qCounter"></div>
+      <div id="qTopic"></div>
+      <div id="qText"></div>
+      <div id="optionsBox"></div>
+      <div id="navBtns">
+        <button class="btn btn-secondary" id="prevBtn">← Anterior</button>
+        <button class="btn btn-secondary" id="nextBtn">Siguiente →</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="strikeModal" class="hidden">
+  <div class="box">
+    <h3>⚠ FALTA DETECTADA</h3>
+    <p id="strikeReason"></p>
+    <div id="strikeCountBig"></div>
+    <p>Faltas acumuladas: <b id="modalStrikes"></b>. Al superar 5 el examen terminará automáticamente.</p>
+    <button class="btn btn-primary" id="closeStrikeModal">Continuar con el examen</button>
+  </div>
+</div>
+
+<div id="resultScreen" class="hidden">
+  <div class="card">
+    <h1 id="resultTitle">Resultados</h1>
+    <div id="finalScore"></div>
+    <p class="res-line" id="resDetail"></p>
+    <p class="res-line" id="resStrikes"></p>
+    <p class="res-line" id="resTime"></p>
+    <p id="saveStatus"></p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+const SUPABASE_ANON_KEY = "TU-ANON-KEY-PUBLICA";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const QUESTIONS = [
+  {t:"1.1 Conjunto de datos", q:"¿Cuál de las siguientes es la característica que define a un conjunto de datos de ALTO VOLUMEN?", o:["Datos que cambian constantemente en tiempo real","Grandes cantidades de datos generados a gran escala","Datos provenientes de múltiples fuentes distintas","Datos con estructura fija y tabular"], a:1},
+  {t:"1.1 Conjunto de datos", q:"Un dataset que combina texto, imágenes, video y registros de sensores se caracteriza principalmente por su:", o:["Alto volumen","Alta velocidad","Alta variedad","Alta veracidad"], a:2},
+  {t:"1.1 Conjunto de datos", q:"Los datos generados por un sensor cada milisegundo que deben procesarse al instante son un ejemplo de:", o:["Alta variedad","Alta velocidad","Alto volumen","Baja densidad"], a:1},
+  {t:"1.1 Conjunto de datos", q:"¿Qué son las '3 V' del Big Data?", o:["Volumen, Velocidad y Variedad","Volumen, Veracidad y Valor","Velocidad, Valor y Variedad","Volumen, Validez y Velocidad"], a:0},
+  {t:"1.1 Conjunto de datos", q:"¿Cuál de estos es un ejemplo de fuente de datos de alta variedad?", o:["Un archivo CSV con registros de ventas","Una tabla SQL con clientes","Redes sociales con texto, fotos y videos","Un log de acceso a un servidor"], a:2},
+  {t:"1.2 Relaciones", q:"¿Qué estructura matemática se utiliza comúnmente para representar relaciones entre pares de objetos en minería de datos?", o:["Vectores sueltos sin organizar","Matriz de datos o matriz de proximidad","Ecuaciones diferenciales","Diagramas de flujo"], a:1},
+  {t:"1.2 Relaciones", q:"La matriz de proximidad tiene como elementos:", o:["Los nombres de los atributos","La distancia o similitud entre pares de objetos","Los valores faltantes del dataset","Las etiquetas de clase de cada registro"], a:1},
+  {t:"1.2 Relaciones", q:"¿Qué medida de DISIMILITUD es la más común para datos numéricos?", o:["Similitud del coseno","Coeficiente de Jaccard","Distancia euclidiana","Correlación de Pearson"], a:2},
+  {t:"1.2 Relaciones", q:"La distancia euclidiana entre dos puntos A(0,0) y B(3,4) es:", o:["5","7","12","25"], a:0},
+  {t:"1.2 Relaciones", q:"La similitud del coseno se basa en:", o:["La diferencia absoluta de magnitudes","El ángulo entre dos vectores","La distancia entre centroides","El producto de varianzas"], a:1},
+  {t:"1.2 Relaciones", q:"El coeficiente de Jaccard se utiliza principalmente para datos de tipo:", o:["Numéricos continuos","Binarios o de presencia/ausencia","Series de tiempo","Texto libre"], a:1},
+  {t:"1.2 Relaciones", q:"¿Qué propiedad NO corresponde a una medida de distancia (métrica) válida?", o:["d(x,y) ≥ 0","d(x,y) = d(y,x)","d(x,z) ≤ d(x,y) + d(y,z)","d(x,y) puede ser negativa"], a:3},
+  {t:"1.2 Relaciones", q:"Las relaciones de secuencia se refieren a:", o:["El orden temporal u orden de aparición de los elementos","La distancia física entre registros","La jerarquía de una base de datos","La velocidad de generación de datos"], a:0},
+  {t:"1.2 Relaciones", q:"Un ejemplo de dato donde importan las relaciones de secuencia es:", o:["Una fotografía aislada","Un registro de transacciones bancarias ordenadas en el tiempo","Una tabla de empleados sin fechas","Un censo poblacional estático"], a:1},
+  {t:"1.3 Preprocesamiento", q:"El MUESTREO de datos consiste en:", o:["Duplicar los registros del dataset","Seleccionar un subconjunto representativo de los datos","Convertir datos categóricos a numéricos","Eliminar registros duplicados"], a:1},
+  {t:"1.3 Preprocesamiento", q:"La CUANTIZACIÓN de datos es el proceso de:", o:["Discretizar valores continuos en un conjunto finito de niveles","Aumentar la resolución de los datos","Fusionar múltiples datasets","Detectar valores atípicos"], a:0},
+  {t:"1.3 Preprocesamiento", q:"¿Cuál de los siguientes es un tipo de error común en los datos?", o:["Error de transcripción (typos)","Error de muestreo","Error de medición","Todas las anteriores"], a:3},
+  {t:"1.3 Preprocesamiento", q:"Los valores faltantes (missing values) se conocen también como:", o:["Outliers","Datos nulos o ausentes","Ruido blanco","Datos atípicos"], a:1},
+  {t:"1.3 Preprocesamiento", q:"La imputación de valores faltantes consiste en:", o:["Eliminar las filas con datos faltantes","Reemplazarlos con valores estimados (media, mediana, moda)","Ignorarlos en el análisis","Convertirlos en ceros"], a:1},
+  {t:"1.3 Preprocesamiento", q:"El FILTRADO de datos tiene como objetivo:", o:["Agregar nuevos atributos","Seleccionar o eliminar registros según criterios o reducir ruido","Cifrar la información","Dividir el dataset en train y test"], a:1},
+  {t:"1.3 Preprocesamiento", q:"¿Cuál es un ejemplo de TRANSFORMACIÓN de datos?", o:["Unir dos tablas por una clave","Normalización o escalado de atributos","Detectar registros duplicados","Cargar datos desde un CSV"], a:1},
+  {t:"1.3 Preprocesamiento", q:"La normalización Min-Max transforma los datos a un rango de:", o:["[-1, 1]","[0, 1]","[0, 100]","[-∞, ∞]"], a:1},
+  {t:"1.3 Preprocesamiento", q:"La INTEGRACIÓN de datos consiste en:", o:["Combinar datos de múltiples fuentes en una vista coherente","Eliminar columnas innecesarias","Ordenar los registros por fecha","Comprimir el archivo de datos"], a:0},
+  {t:"1.3 Preprocesamiento", q:"Un valor atípico (outlier) es:", o:["Un dato que falta en el registro","Una observación que se aleja notablemente del resto","Un dato duplicado","Un tipo de dato categórico"], a:1},
+  {t:"1.3 Preprocesamiento", q:"¿Cuál es la razón principal de preprocesar los datos antes del análisis?", o:["Para aumentar el tamaño del dataset","Para mejorar la calidad y utilidad de los datos","Para hacer el código más corto","Para evitar usar bases de datos"], a:1},
+  {t:"2.1.1 Coef. de Pearson", q:"El coeficiente de correlación de Pearson mide:", o:["La causalidad entre dos variables","La relación LINEAL entre dos variables cuantitativas","La diferencia de medias entre grupos","La frecuencia de categorías"], a:1},
+  {t:"2.1.1 Coef. de Pearson", q:"El rango de valores del coeficiente de Pearson es:", o:["De 0 a 1","De -1 a 1","De -∞ a +∞","De 0 a 100"], a:1},
+  {t:"2.1.1 Coef. de Pearson", q:"Un coeficiente de Pearson de r = -0.95 indica:", o:["Correlación lineal negativa muy fuerte","Correlación lineal positiva muy fuerte","Ausencia total de correlación","Correlación perfectamente curvilínea"], a:0},
+  {t:"2.1.1 Coef. de Pearson", q:"Si r = 0 entre dos variables, significa que:", o:["Una variable causa la otra","No existe relación LINEAL entre las variables","Las variables son idénticas","El cálculo fue incorrecto"], a:1},
+  {t:"2.1.1 Coef. de Pearson", q:"¿Qué condición debe cumplirse para que Pearson sea apropiado?", o:["Las variables deben ser categóricas","La relación debe ser aproximadamente lineal y las variables cuantitativas","Los datos deben tener más de 1000 registros","Las variables deben estar normalizadas siempre"], a:1},
+  {t:"2.1.1 Coef. de Pearson", q:"¿Cuál es una limitación importante de la correlación de Pearson?", o:["Solo funciona con 3 variables","Es sensible a valores atípicos y no captura relaciones no lineales","No puede dar valores negativos","Requiere datos de texto"], a:1},
+];
+
+const EXAM_MINUTES = 90;
+const MAX_STRIKES = 5;
+let answers = new Array(QUESTIONS.length).fill(null);
+let currentQ = 0;
+let strikes = 0;
+let timeLeft = EXAM_MINUTES * 60;
+let timerInterval = null;
+let examFinished = false;
+let modalOpen = false;
+let studentName = "", studentEmail = "";
+
+async function enterFullscreen() {
+  try { await document.documentElement.requestFullscreen(); } catch(e) {}
+}
+
+document.getElementById('startBtn').addEventListener('click', async () => {
+  const name = document.getElementById('studentName').value.trim();
+  const email = document.getElementById('studentEmail').value.trim();
+  const err = document.getElementById('startError');
+  if (!name || !email) { err.textContent = "⚠ Debes ingresar tu nombre y correo para iniciar."; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "⚠ Ingresa un correo válido."; return; }
+  studentName = name; studentEmail = email;
+  await enterFullscreen();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('examScreen').classList.remove('hidden');
+  document.getElementById('studentLabel').textContent = "👤 " + name;
+  buildGrid();
+  renderQuestion();
+  startTimer();
+});
+
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) finishExam("time");
+  }, 1000);
+}
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft/60), s = timeLeft%60;
+  const el = document.getElementById('timer');
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.classList.toggle('low', timeLeft <= 300);
+}
+
+function buildGrid() {
+  const grid = document.getElementById('qGrid');
+  grid.innerHTML = "";
+  QUESTIONS.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'qdot unanswered';
+    d.textContent = i+1;
+    d.id = 'dot'+i;
+    d.addEventListener('click', () => { currentQ = i; renderQuestion(); });
+    grid.appendChild(d);
+  });
+}
+function updateGrid() {
+  QUESTIONS.forEach((_, i) => {
+    const d = document.getElementById('dot'+i);
+    d.className = 'qdot ' + (answers[i] !== null ? 'answered' : 'unanswered') + (i === currentQ ? ' current' : '');
+  });
+}
+function renderQuestion() {
+  const q = QUESTIONS[currentQ];
+  document.getElementById('qCounter').textContent = `Pregunta ${currentQ+1} de ${QUESTIONS.length}`;
+  document.getElementById('qTopic').textContent = q.t;
+  document.getElementById('qText').textContent = q.q;
+  const box = document.getElementById('optionsBox');
+  box.innerHTML = "";
+  const letters = ['A','B','C','D','E','F'];
+  q.o.forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'option' + (answers[currentQ] === i ? ' selected' : '');
+    div.innerHTML = `<span class="letter">${letters[i]}</span><span>${opt}</span>`;
+    div.addEventListener('click', () => { answers[currentQ] = i; renderQuestion(); });
+    box.appendChild(div);
+  });
+  document.getElementById('prevBtn').disabled = currentQ === 0;
+  document.getElementById('nextBtn').textContent = currentQ === QUESTIONS.length-1 ? "🏁 Revisar y entregar" : "Siguiente →";
+  updateGrid();
+}
+document.getElementById('prevBtn').addEventListener('click', () => { if(currentQ>0){ currentQ--; renderQuestion(); } });
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if(currentQ < QUESTIONS.length-1){ currentQ++; renderQuestion(); }
+  else confirmSubmit();
+});
+document.getElementById('submitBtn').addEventListener('click', confirmSubmit);
+
+function confirmSubmit() {
+  const empty = answers.filter(a => a === null).length;
+  const msg = empty > 0
+    ? `Tienes ${empty} pregunta(s) sin contestar. ¿Deseas entregar de todos modos?`
+    : "¿Estás seguro de que deseas entregar el examen?";
+  if (confirm(msg)) finishExam("manual");
+}
+
+function addStrike(reason) {
+  if (examFinished || modalOpen) return;
+  strikes++;
+  document.getElementById('strikeCount').textContent = strikes;
+  document.getElementById('strikeReason').textContent = reason;
+  document.getElementById('modalStrikes').textContent = strikes;
+  document.getElementById('strikeCountBig').textContent = `${strikes} / ${MAX_STRIKES}`;
+  modalOpen = true;
+  document.getElementById('strikeModal').classList.remove('hidden');
+  if (strikes > MAX_STRIKES) {
+    document.getElementById('closeStrikeModal').classList.add('hidden');
+    setTimeout(() => finishExam("strikes"), 2500);
+  }
+}
+document.getElementById('closeStrikeModal').addEventListener('click', () => {
+  document.getElementById('strikeModal').classList.add('hidden');
+  modalOpen = false;
+  enterFullscreen();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !examFinished) addStrike("Se detectó que cambiaste de pestaña o minimizaste la ventana.");
+});
+window.addEventListener('blur', () => {
+  if (!examFinished && !modalOpen) addStrike("Se detectó que la ventana del examen perdió el foco.");
+});
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && !examFinished && !modalOpen && !document.getElementById('examScreen').classList.contains('hidden')) {
+    addStrike("Se detectó que saliste del modo de pantalla completa.");
+  }
+});
+['copy','paste','cut'].forEach(evt =>
+  document.addEventListener(evt, e => {
+    if (examFinished) return;
+    e.preventDefault();
+    addStrike(`Se detectó un intento de ${evt === 'copy' ? 'COPIAR' : evt === 'paste' ? 'PEGAR' : 'CORTAR'} texto. Está prohibido.`);
+  })
+);
+document.addEventListener('contextmenu', e => {
+  if (examFinished) return;
+  e.preventDefault();
+  addStrike("Se detectó el uso del menú contextual (clic derecho). Está prohibido.");
+});
+document.addEventListener('keydown', e => {
+  if (examFinished) return;
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey && ['c','v','x','p','u'].includes(k)) || e.key === 'F12' || (e.ctrlKey && e.shiftKey && k === 'i')) {
+    e.preventDefault();
+    addStrike("Se detectó el uso de un atajo de teclado prohibido (copiar/pegar/inspeccionar).");
+  }
+});
+
+function computeScore() {
+  let correct = 0;
+  QUESTIONS.forEach((q, i) => { if (answers[i] === q.a) correct++; });
+  return correct;
+}
+
+async function finishExam(reason) {
+  if (examFinished) return;
+  examFinished = true;
+  clearInterval(timerInterval);
+  document.getElementById('strikeModal').classList.add('hidden');
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+
+  const score = computeScore();
+  const answeredCount = answers.filter(a => a !== null).length;
+  const elapsed = EXAM_MINUTES*60 - timeLeft;
+  const elMin = Math.floor(elapsed/60), elSec = elapsed%60;
+
+  document.getElementById('examScreen').classList.add('hidden');
+  document.getElementById('resultScreen').classList.remove('hidden');
+
+  const title = document.getElementById('resultTitle');
+  if (reason === "strikes") title.textContent = "⛔ Examen terminado por infracciones";
+  else if (reason === "time") title.textContent = "⏰ Tiempo agotado — Resultados";
+  else title.textContent = "✅ Resultados del examen";
+
+  document.getElementById('finalScore').textContent = `${score} / ${QUESTIONS.length}`;
+  document.getElementById('resDetail').textContent = `Preguntas contestadas: ${answeredCount}/${QUESTIONS.length} · Aciertos: ${score} · Calificación sobre 10: ${(score/QUESTIONS.length*10).toFixed(1)}`;
+  document.getElementById('resStrikes').textContent = `Faltas registradas: ${strikes}`;
+  document.getElementById('resTime').textContent = `Tiempo utilizado: ${elMin} min ${elSec} s`;
+
+  const status = document.getElementById('saveStatus');
+  status.textContent = "💾 Guardando resultados en la base de datos...";
+  try {
+    const detail = QUESTIONS.map((q,i)=>({n:i+1, tema:q.t, correcta:q.a===answers[i], seleccionada:answers[i]}));
+    const { error } = await supabase.from('exam_results').insert({
+      nombre: studentName,
+      email: studentEmail,
+      aciertos: score,
+      total: QUESTIONS.length,
+      calificacion: parseFloat((score/QUESTIONS.length*10).toFixed(1)),
+      faltas: strikes,
+      motivo_fin: reason,
+      tiempo_usado_seg: elapsed,
+      detalle: detail
+    });
+    if (error) throw error;
+    status.textContent = "✅ Resultados guardados correctamente en Supabase.";
+  } catch(err) {
+    status.textContent = "⚠ No se pudieron guardar los resultados en Supabase. Verifica la configuración (URL, key y tabla). Detalle: " + err.message;
+  }
+}
+</script>
+</body>
+</html>
